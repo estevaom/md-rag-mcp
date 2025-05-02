@@ -15,12 +15,14 @@ The project is organized with a focus on journaling, with technical components h
 │   │       ├── 18.md         # Daily entries
 │   │       └── 19.md
 │   └── topics/               # Topic-based entries (future use)
-└── .tech/                    # Technical components (hidden)
-    ├── docs/                 # Documentation
-    ├── code/                 # Code and scripts
-    │   └── scripts/          # Python scripts
-    └── data/                 # Data storage
-        └── chroma_db/        # Vector database
+├── code/                     # Code and scripts
+│   ├── mcp/                  # MCP server code
+│   │   └── journal_rag_mcp.py
+│   ├── scripts/              # Python scripts
+│   │   └── rag_search.py
+│   └── data/                 # Data storage (e.g., vector DB)
+│       └── chroma_db/        # Vector database (example)
+└── .venv/                    # Python virtual environment
 ```
 
 ## Usage
