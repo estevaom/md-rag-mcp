@@ -1,0 +1,7 @@
+chromadb
+sentence-transformers
+torch
+# Add torchvision and torchaudio as they are often needed by torch/sentence-transformers
+torchvision
+torchaudio
+python-frontmatter
