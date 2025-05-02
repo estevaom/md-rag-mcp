@@ -183,6 +183,57 @@ To ensure the RAG script leverages the GPU for embedding generation and uses the
    - Create embeddings and store them in the vector database
    - Allow you to query the database
 
+## 9. MCP Server Setup (Optional)
+
+This section describes how to set up the Model Context Protocol (MCP) server, which allows the AI assistant (like Roo in VS Code) to interact with your local journal data.
+
+### Step 1: Install MCP Dependencies
+
+The MCP server has its own set of Python dependencies. Ensure your virtual environment (`.venv`) is activated before running this command:
+
+```bash
+pip install -r code/mcp/requirements.txt
+```
+
+### Step 2: Configure VS Code
+
+You need to tell VS Code how to find and run the MCP server script.
+
+1.  Open VS Code Settings:
+    *   Go to `File > Preferences > Settings` (or use the shortcut `Ctrl+,`).
+2.  Search for "MCP Servers":
+    *   In the search bar, type `mcp servers`.
+3.  Add Server Configuration:
+    *   Find the "Model Context Protocol: Servers" setting and click "Edit in settings.json".
+    *   Add the following JSON object to the `mcpServers` configuration. If `mcpServers` doesn't exist, create it.
+
+    ```json
+    {
+      "mcpServers": {
+        "journal-rag-mcp": {
+          "command": "${workspaceFolder}/.venv/bin/python3",
+          "args": [
+            "./code/mcp/journal_rag_mcp.py" // Path relative to workspaceFolder
+          ],
+          "env": {},
+          "disabled": false,
+          "alwaysAllow": [],
+          "autoApprove": [
+            "query_journal" // Automatically approve journal queries
+          ]
+        }
+      }
+    }
+    ```
+
+4.  **Explanation:**
+    *   `${workspaceFolder}` is a VS Code variable representing the root directory of your project (`md-rag-mcp`).
+    *   The `command` points to the Python interpreter within your virtual environment.
+    *   The `args` specify the MCP server script to run.
+    *   `autoApprove` allows the specified tool (`query_journal`) to run without prompting you each time.
+5.  Restart VS Code:
+    *   It's often a good idea to restart VS Code after changing this setting to ensure the server is recognized.
+
 ## Troubleshooting
 
 ### CUDA Not Detected
