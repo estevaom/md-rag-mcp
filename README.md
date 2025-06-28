@@ -7,7 +7,7 @@ A powerful, privacy-focused journal system with AI-powered semantic search and m
 - **🔍 Semantic Search**: Query your journal entries using natural language  
 - **📊 Frontmatter Analysis**: Track mood, anxiety, weight, and custom metrics over time
 - **🤖 AI Agent Integration**: Connect to AI assistants like Rovo Dev, VS Code, etc.
-- **🔒 Privacy-First**: Everything runs locally, your data never leaves your machine
+- **🏠 Local Processing**: Journal files and search indexing stay on your machine
 - **🚀 GPU Acceleration**: Optional NVIDIA GPU support for faster embeddings
 - **📱 Cross-Platform**: macOS, Ubuntu/Debian, Arch Linux, and Windows/WSL with automated setup
 
@@ -148,25 +148,29 @@ Rovo Dev is a free AI agent built by Atlassian that works excellently with this 
    # Open Rovo Dev's MCP configuration file
    acli rovodev mcp
    
-   # Copy the contents from rovo-dev-mcp.json.template
+   # Copy the contents from mcp.json.template
    # Replace ${PROJECT_ROOT} with your actual path, e.g.:
    # /Users/yourname/Documents/md-rag-mcp
    ```
-3. **Start Rovo Dev**:
+3. **Create .agent.md**: Create a custom persona that defines how Rovo Dev should interact with your journal. This persona can help with thoughtful questioning, pattern recognition across entries, balanced reflection prompts, and contextual analysis of your journaling themes and personal growth over time.
+4. **Start Rovo Dev**:
    ```bash
    acli rovodev
    ```
-4. **Start Querying**: Try commands like:
+5. **Start Querying**: Try commands like:
    - "What did I write about yesterday?"
    - "Show me my mood trends this month"
    - "Find entries where I mentioned productivity"
 
-### VS Code
-1. Install MCP extension
-2. Configure MCP servers in VS Code settings
-3. Use the template configuration with your actual paths
-
 ### Other Agents
+**Cloud-based options:**
+- **Cursor**: MCP-compatible, all conversations sent to cloud
+- **GitHub Copilot**: If MCP-compatible, cloud-based
+
+**Local privacy options:**
+- **Cline** (VS Code extension): Can connect to local LLMs (Ollama, LM Studio)
+- **Roo Code** (VS Code extension): Can connect to local LLMs for complete privacy
+
 Any MCP-compatible AI agent can connect using the provided configuration.
 
 ## 📊 Frontmatter Fields
@@ -198,11 +202,6 @@ If you have an NVIDIA GPU, the system will automatically use it for faster embed
 # Check GPU status
 python -c "import torch; print('CUDA available:', torch.cuda.is_available())"
 ```
-
-### Custom Embedding Models
-Modify the embedding model in the MCP servers:
-- Default: `all-MiniLM-L6-v2` (fast, good quality)
-- Alternative: `all-mpnet-base-v2` (slower, better quality)
 
 ### Backup and Sync
 Your journal is just markdown files - sync with any service:
@@ -254,4 +253,20 @@ This project is open source. See LICENSE file for details.
 
 ---
 
-**Privacy Note**: This system is designed to keep your personal data completely private. All processing happens locally on your machine, and no data is sent to external services unless you explicitly configure such integrations.
+## 🔒 Privacy & Data Considerations
+
+**What stays private (always local):**
+- Your journal files and content
+- RAG embeddings and search indexing
+- Frontmatter analysis and statistics
+- All file processing and storage
+
+**What gets exposed with cloud-based AI agents (Rovo Dev, Cursor - both 100% cloud-based):**
+- Your conversations about journal content
+- AI-generated insights and analysis
+- Personal reflections and patterns discussed
+- Any journal excerpts shared during conversations
+
+**For complete privacy:** Use VS Code extensions like Cline or Roo Code with local LLMs (Ollama, LM Studio, etc.). These extensions can connect to local models while keeping all conversations on your machine.
+
+**Bottom line:** Your raw journal data stays local, but if you use cloud AI agents to analyze it, those conversations are not private.

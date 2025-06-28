@@ -11,9 +11,9 @@ console = Console()
 
 # --- Configuration ---
 # Get the project root directory (assuming script is in code/scripts/)
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) # Go up 3 levels
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))) # Go up 4 levels
 DATA_DIRECTORY = os.path.join(PROJECT_ROOT, "journal")
-CHROMA_DB_PATH = os.path.join(PROJECT_ROOT, "code", "data", "chroma_db") # Adjusted path relative to new PROJECT_ROOT
+CHROMA_DB_PATH = os.path.join(PROJECT_ROOT, ".tech", "data", "chroma_db") # Adjusted path relative to new PROJECT_ROOT 
 CHROMA_COLLECTION_NAME = "life_journal_collection"
 EMBEDDING_MODEL_NAME = 'all-MiniLM-L6-v2'
 CHUNK_SIZE = 500  # Max characters per chunk

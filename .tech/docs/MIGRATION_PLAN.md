@@ -205,7 +205,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
   - Example queries and usage patterns
 
 #### Step 8.2: Rovo Dev Configuration Templates
-- **File:** `rovo-dev-mcp.json.template`
+- **File:** `mcp.json.template`
 - **Content:** Ready-to-use MCP configuration for Rovo Dev
 - **Instructions:** Step-by-step Rovo Dev integration guide
 
@@ -214,7 +214,6 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 ### Path Sanitization Strategy
 1. **Environment Variable Approach:**
    ```bash
-   export JOURNAL_ROOT="/path/to/your/journal"
    export PROJECT_ROOT="/path/to/md-rag-mcp"
    ```
 
@@ -304,6 +303,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 - **Phase 8:** Rovo Dev integration (1 hour)
 
 **Total Estimated Time:** 11-17 hours of focused development work
+**Actual Time Taken:** Cursor did it in 5 minutes
 
 ---
 
