@@ -27,15 +27,15 @@ except ImportError as e:
     sys.exit(1)
 
 # --- Configuration ---
-# Calculate PROJECT_ROOT based on this script's location (code/mcp/journal_rag_mcp.py)
+# Calculate PROJECT_ROOT based on this script's location (.tech/code/mcp/journal_rag_mcp.py)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-# PROJECT_ROOT is two directories up from SCRIPT_DIR
-PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
+TECH_DIR = os.path.dirname(os.path.dirname(SCRIPT_DIR)) # .tech/
+PROJECT_ROOT = os.path.dirname(TECH_DIR)  # Project root directory
 
-CHROMA_DB_PATH = os.path.join(PROJECT_ROOT, "code", "data", "chroma_db")
+CHROMA_DB_PATH = os.path.join(PROJECT_ROOT, ".tech", "data", "chroma_db")
 CHROMA_COLLECTION_NAME = "life_journal_collection"
 EMBEDDING_MODEL_NAME = 'all-MiniLM-L6-v2'
-DEFAULT_N_RESULTS = 3
+DEFAULT_N_RESULTS = 10
 
 # --- Global Variables ---
 embedding_model = None
@@ -99,8 +99,8 @@ def initialize_resources():
 # --- Timestamp Tracking Functions ---
 def get_last_indexed_time():
     """Gets the timestamp of the last indexing operation."""
-    timestamp_file = os.path.join(PROJECT_ROOT, "code", "data", "last_indexed_time.txt")
-
+    timestamp_file = os.path.join(TECH_DIR, "data", "last_indexed_time.txt")
+    
     if not os.path.exists(timestamp_file):
         return 0  # Return 0 if file doesn't exist (never indexed)
         
@@ -113,8 +113,8 @@ def get_last_indexed_time():
 
 def update_last_indexed_time():
     """Updates the timestamp of the last indexing operation to current time."""
-    timestamp_file = os.path.join(PROJECT_ROOT, "code", "data", "last_indexed_time.txt")
-
+    timestamp_file = os.path.join(TECH_DIR, "data", "last_indexed_time.txt")
+    
     try:
         # Create directory if it doesn't exist
         timestamp_dir = os.path.dirname(timestamp_file)
@@ -192,11 +192,11 @@ def update_journal_index(full_reindex=False):
     """
     try:
         # Import functions from rag_search.py
-        sys.path.append(os.path.join(PROJECT_ROOT, "code", "scripts"))
+        sys.path.append(os.path.join(TECH_DIR, "code", "scripts"))
         try:
             from rag_search import (
                 load_markdown_docs, split_docs, initialize_embedding_model,
-                initialize_vector_store, index_chunks
+                initialize_vector_store, index_chunks, create_semantic_chunks
             )
         except ImportError as e:
             log_error(f"Error importing from rag_search.py: {e}")
@@ -298,6 +298,190 @@ def perform_rag_query(query_text: str, n_results: int = DEFAULT_N_RESULTS):
         log_error(f"Error during query: {e}")
         log_error(traceback.format_exc())
         return None, str(e) # No results, Error message
+
+def expand_context_for_results(collection, results, n_results=3):
+    """
+    When we get chunk results, expand them to include more context
+    by fetching related chunks or full entries.
+    Returns exactly n_results, no more.
+    """
+    if not results or not results.get('ids') or not results['ids'][0]:
+        return results
+    
+    log_info(f"Starting expand_context_for_results with {len(results['ids'][0])} input results, target: {n_results}")
+    
+    expanded_results = {
+        'ids': [[]],
+        'documents': [[]],
+        'metadatas': [[]],
+        'distances': [[]]
+    }
+    
+    seen_sources = set()
+    results_added = 0
+    
+    for i, chunk_id in enumerate(results['ids'][0]):
+        # CRITICAL FIX: Check limit BEFORE processing each result
+        if results_added >= n_results:
+            log_info(f"HARD STOP: Already have {results_added} results (target: {n_results}), skipping remaining")
+            break
+            
+        metadata = results['metadatas'][0][i]
+        source = metadata.get('source', '')
+        
+        log_info(f"Processing result {i+1}: source={source}, chunk_type={metadata.get('chunk_type', 'unknown')}")
+        
+        # Skip if we've already processed this source
+        if source in seen_sources:
+            log_info(f"Skipping duplicate source: {source}")
+            continue
+        
+        # CRITICAL FIX: Double-check limit before adding to avoid race condition
+        if results_added >= n_results:
+            log_info(f"HARD STOP (pre-add): Already have {results_added} results, not adding source: {source}")
+            break
+            
+        # Try to get full entry for partial chunks, otherwise use original
+        if metadata.get('chunk_type') == 'partial_entry':
+            try:
+                # Get all items matching the criteria
+                all_items = collection.get(
+                    where={
+                        "$and": [
+                            {"source": {"$eq": source}},
+                            {"chunk_type": {"$eq": "full_entry"}}
+                        ]
+                    },
+                    include=['documents', 'metadatas']
+                )
+                
+                if all_items and all_items.get('ids') and len(all_items['ids']) > 0:
+                    # Use the full entry
+                    expanded_results['ids'][0].append(all_items['ids'][0])
+                    expanded_results['documents'][0].append(all_items['documents'][0])
+                    expanded_results['metadatas'][0].append(all_items['metadatas'][0])
+                    expanded_results['distances'][0].append(results['distances'][0][i])
+                    log_info(f"Expanded to full entry for source: {source}")
+                else:
+                    # Fall back to original chunk
+                    expanded_results['ids'][0].append(results['ids'][0][i])
+                    expanded_results['documents'][0].append(results['documents'][0][i])
+                    expanded_results['metadatas'][0].append(results['metadatas'][0][i])
+                    expanded_results['distances'][0].append(results['distances'][0][i])
+                    log_info(f"Using original chunk for source: {source}")
+            except Exception as e:
+                log_error(f"Error getting full entry for source {source}: {e}")
+                # Fall back to original chunk
+                expanded_results['ids'][0].append(results['ids'][0][i])
+                expanded_results['documents'][0].append(results['documents'][0][i])
+                expanded_results['metadatas'][0].append(results['metadatas'][0][i])
+                expanded_results['distances'][0].append(results['distances'][0][i])
+                log_info(f"Using original chunk (fallback) for source: {source}")
+        else:
+            # Use the original result
+            expanded_results['ids'][0].append(results['ids'][0][i])
+            expanded_results['documents'][0].append(results['documents'][0][i])
+            expanded_results['metadatas'][0].append(results['metadatas'][0][i])
+            expanded_results['distances'][0].append(results['distances'][0][i])
+            log_info(f"Using original result for source: {source}")
+        
+        seen_sources.add(source)
+        results_added += 1
+        log_info(f"Added result {results_added}/{n_results} from source: {source}")
+        
+        # CRITICAL FIX: Final check after adding
+        if results_added >= n_results:
+            log_info(f"REACHED TARGET: {results_added} results added, stopping immediately")
+            break
+    
+    actual_count = len(expanded_results['ids'][0])
+    log_info(f"Expanded context returning {actual_count} results (requested: {n_results})")
+    
+    # EMERGENCY TRUNCATION if somehow we still have too many
+    if actual_count > n_results:
+        log_error(f"EMERGENCY: expand_context_for_results returned {actual_count} but should return {n_results}!")
+        for key in expanded_results:
+            if expanded_results[key] and expanded_results[key][0]:
+                expanded_results[key][0] = expanded_results[key][0][:n_results]
+        log_error(f"Emergency truncation applied, now returning {len(expanded_results['ids'][0])} results")
+    
+    return expanded_results
+
+def perform_enhanced_rag_query(query_text: str, n_results: int = DEFAULT_N_RESULTS):
+    """
+    Enhanced semantic search that returns meaningful, contextualized results.
+    """
+    if not is_initialized or embedding_model is None or chroma_collection is None:
+        log_error("Query attempted before resources were initialized.")
+        return None, "Resources not initialized"
+
+    try:
+        log_info(f"Encoding query: '{query_text}'")
+        query_embedding = embedding_model.encode([query_text.strip()])
+
+        # Get more candidates to ensure we have enough unique sources but not too many
+        candidates_to_fetch = n_results * 2  # Get 2x more candidates to allow for deduplication
+        log_info(f"Querying collection '{chroma_collection.name}' for {candidates_to_fetch} candidates...")
+        raw_results = chroma_collection.query(
+            query_embeddings=query_embedding.tolist(),
+            n_results=candidates_to_fetch,
+            include=['documents', 'metadatas', 'distances']
+        )
+        log_info(f"Raw query returned {len(raw_results['ids'][0]) if raw_results['ids'] else 0} results")
+        
+        # Expand context and deduplicate by source
+        expanded_results = expand_context_for_results(chroma_collection, raw_results, n_results)
+        
+        # Format results with better structure
+        formatted_results = []
+        if expanded_results and expanded_results.get('ids') and expanded_results['ids'][0]:
+            for i, doc_text in enumerate(expanded_results['documents'][0]):
+                metadata = expanded_results['metadatas'][0][i] if expanded_results['metadatas'] and expanded_results['metadatas'][0] else {}
+                distance = expanded_results['distances'][0][i] if expanded_results['distances'] and expanded_results['distances'][0] else None
+                
+                # Add contextual information
+                source = metadata.get('source', 'N/A')
+                date_created = metadata.get('date', metadata.get('created', 'Unknown date'))
+                chunk_type = metadata.get('chunk_type', 'unknown')
+                
+                formatted_results.append({
+                    "source": source,
+                    "date": date_created,
+                    "text": doc_text,
+                    "distance": distance,
+                    "chunk_type": chunk_type,
+                    "context_note": f"Full entry from {source}" if chunk_type == 'full_entry' else f"Excerpt from {source}"
+                })
+        
+        # Critical bug fix: ensure we return exactly n_results (strict enforcement)
+        log_info(f"Before final truncation: {len(formatted_results)} results")
+        
+        # AGGRESSIVE FIX: Always truncate to exact number regardless of what happened before
+        if len(formatted_results) > n_results:
+            log_info(f"TRUNCATING: Had {len(formatted_results)} results, cutting to {n_results}")
+            final_results = formatted_results[:n_results]
+        else:
+            final_results = formatted_results
+            
+        log_info(f"After final truncation: {len(final_results)} results (requested: {n_results})")
+        
+        # Debug: Log sources to verify deduplication
+        sources_returned = [result['source'] for result in final_results]
+        log_info(f"Sources returned: {sources_returned}")
+        
+        # Final verification - this should NEVER trigger now
+        if len(final_results) != n_results:
+            log_error(f"CRITICAL BUG STILL EXISTS: Returning {len(final_results)} results instead of {n_results}!")
+            # Emergency fallback
+            final_results = final_results[:n_results]
+            log_error(f"Emergency truncation applied, now returning {len(final_results)} results")
+        
+        return final_results, None
+
+    except Exception as e:
+        log_error(f"Error during enhanced query: {e}")
+        log_error(traceback.format_exc())
+        return None, str(e)
 
 # --- MCP Response Formatting ---
 def create_mcp_response(request_id, result=None, error=None):
@@ -435,10 +619,16 @@ def main():
                     elif not isinstance(n_results, int) or n_results < 1:
                          response = create_mcp_response(request_id, error=create_mcp_error(-32602, f"Invalid params: 'n_results' must be a positive integer (default: {DEFAULT_N_RESULTS})."))
                     else:
-                        results, error_msg = perform_rag_query(query, n_results)
+                        results, error_msg = perform_enhanced_rag_query(query, n_results)
                         if error_msg:
                             response = create_mcp_response(request_id, error=create_mcp_error(-32000, f"Query execution failed: {error_msg}"))
                         else:
+                            # FINAL ABSOLUTE PROTECTION: Force exact count at the very last moment
+                            if len(results) != n_results:
+                                log_error(f"FINAL CATCH: Results length {len(results)} != requested {n_results}. FORCING TRUNCATION.")
+                                results = results[:n_results]
+                                log_error(f"Final forced truncation: now have {len(results)} results")
+                            
                             # Embed the list of results as a JSON string within the text content
                             response = create_mcp_response(request_id, result={
                                 "content": [{
@@ -505,3 +695,4 @@ if __name__ == "__main__":
         sys.exit(1) # Ensure non-zero exit code on unhandled error
     finally:
         log_info("Server process ending.")
+        

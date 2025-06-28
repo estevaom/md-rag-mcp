@@ -1,9 +1,0 @@
-# Core dependencies for Project Life RAG PoC (Phase 1)
-# Generated based on initial plan. Run 'pip freeze > requirements.txt'
-# within the activated .venv to get exact versions after installation.
-
-python-frontmatter
-langchain-text-splitters
-sentence-transformers
-chromadb
-rich
