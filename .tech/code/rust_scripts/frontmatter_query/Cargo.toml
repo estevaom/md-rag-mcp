@@ -1,0 +1,16 @@
+[package]
+name = "frontmatter-query"
+version = "0.1.0"
+edition = "2024"
+authors = ["Estevão de Abreu Machado"]
+description = "Query and analyze frontmatter data from journal markdown files"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+chrono = { version = "0.4", features = ["serde"] }
+walkdir = "2.5"
+regex = "1.10"
+anyhow = "1.0"
