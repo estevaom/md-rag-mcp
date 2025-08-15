@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to set up Python environments and dependencies on Ubuntu (including WSL)
+# Script to set up Rust tools on Ubuntu/Debian (including WSL)
 
 # Function to print messages
 print_message() {
@@ -15,106 +15,82 @@ print_message "Checking and installing system dependencies..."
 # Update package lists
 sudo apt update
 
-# Install Python development tools and build essentials
-sudo apt install -y python3-venv python3-full build-essential python3-dev
+# Install build essentials and protobuf (for LanceDB)
+sudo apt install -y build-essential protobuf-compiler
 
-# Ensure we have the latest pip
-python3 -m pip install --upgrade pip --user
-
-# --- 2. NVIDIA CUDA Check ---
-print_message "Checking for NVIDIA CUDA drivers..."
-if ! command -v nvidia-smi &> /dev/null; then
-  echo "nvidia-smi not found. GPU acceleration not available."
-  echo "If you have an NVIDIA GPU:"
-  echo "- On WSL: Install NVIDIA drivers on Windows host"
-  echo "- On native Ubuntu: Install nvidia-driver-xxx package"
-  echo "- Refer to NVIDIA documentation for your specific setup"
-  echo "Continuing with CPU-only setup..."
+# --- 2. Rust Installation ---
+print_message "Checking and installing Rust via rustup..."
+if ! command -v rustc &> /dev/null; then
+  echo "Rust not found. Installing via rustup..."
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+  source "$HOME/.cargo/env"
+  echo "Rust installed successfully!"
+  rustc --version
+  cargo --version
 else
-  echo "NVIDIA drivers detected via nvidia-smi."
-  nvidia-smi
+  echo "Rust is already installed:"
+  rustc --version
+  cargo --version
 fi
 
-# --- 3. Project Paths ---
-SCRIPTS_DIR=".tech/code/scripts"
-MCP_DIR=".tech/code/mcp"
-SCRIPTS_VENV_DIR="$SCRIPTS_DIR/.venv"
-MCP_VENV_DIR="$MCP_DIR/.venv"
+# --- 3. Build Rust Tools ---
+print_message "Building Rust CLI tools..."
 
-# --- 4. Setup for .tech/code/scripts ---
-print_message "Setting up environment for $SCRIPTS_DIR..."
-if [ -d "$SCRIPTS_DIR" ]; then
-  if [ -f "$SCRIPTS_DIR/requirements.txt" ]; then
-    echo "Creating Python virtual environment in $SCRIPTS_VENV_DIR..."
-    python3 -m venv "$SCRIPTS_VENV_DIR"
-    echo "Activating virtual environment for $SCRIPTS_DIR..."
-    # shellcheck source=./.tech/code/scripts/.venv/bin/activate
-    source "$SCRIPTS_VENV_DIR/bin/activate"
-    echo "Upgrading pip in virtual environment..."
-    pip install --upgrade pip
-    echo "Installing dependencies from $SCRIPTS_DIR/requirements.txt..."
-    pip install -r "$SCRIPTS_DIR/requirements.txt"
-    deactivate
-    echo "Setup for $SCRIPTS_DIR complete."
+# Build frontmatter query tool
+FRONTMATTER_DIR=".tech/code/rust_scripts/frontmatter_query"
+if [ -d "$FRONTMATTER_DIR" ]; then
+  echo "Building frontmatter query tool..."
+  (cd "$FRONTMATTER_DIR" && cargo build --release)
+  if [ $? -eq 0 ]; then
+    echo "✅ Frontmatter query tool built successfully"
   else
-    echo "WARNING: $SCRIPTS_DIR/requirements.txt not found. Skipping dependency installation for scripts."
+    echo "❌ Failed to build frontmatter query tool"
   fi
 else
-  echo "WARNING: Directory $SCRIPTS_DIR not found. Skipping setup for scripts."
+  echo "WARNING: $FRONTMATTER_DIR not found"
 fi
 
-# --- 5. Setup for .tech/code/mcp ---
-print_message "Setting up environment for $MCP_DIR..."
-if [ -d "$MCP_DIR" ]; then
-  if [ -f "$MCP_DIR/requirements.txt" ]; then
-    echo "Creating Python virtual environment in $MCP_VENV_DIR..."
-    python3 -m venv "$MCP_VENV_DIR"
-    echo "Activating virtual environment for $MCP_DIR..."
-    # shellcheck source=./.tech/code/mcp/.venv/bin/activate
-    source "$MCP_VENV_DIR/bin/activate"
-    echo "Upgrading pip in virtual environment..."
-    pip install --upgrade pip
-    echo "Installing dependencies from $MCP_DIR/requirements.txt..."
-    pip install -r "$MCP_DIR/requirements.txt"
-    deactivate
-    echo "Setup for $MCP_DIR complete."
+# Build RAG search tools
+RAG_DIR=".tech/code/rust_scripts/rag_search"
+if [ -d "$RAG_DIR" ]; then
+  echo "Building RAG search tools..."
+  echo "Note: First build will download embedding models (~400MB)"
+  (cd "$RAG_DIR" && cargo build --release)
+  if [ $? -eq 0 ]; then
+    echo "✅ RAG search tools built successfully"
+    echo "   - rag-index: For indexing journal entries"
+    echo "   - rag-search: For semantic search"
   else
-    echo "WARNING: $MCP_DIR/requirements.txt not found. Skipping dependency installation for MCP."
+    echo "❌ Failed to build RAG search tools"
   fi
 else
-  echo "WARNING: Directory $MCP_DIR not found. Skipping setup for MCP."
+  echo "WARNING: $RAG_DIR not found"
 fi
 
-# --- 6. Verify GPU Setup (if available) ---
-if command -v nvidia-smi &> /dev/null; then
-  print_message "Verifying GPU acceleration setup..."
-  echo "Testing PyTorch CUDA detection..."
-  source "$MCP_VENV_DIR/bin/activate"
-  python3 -c "
-import torch
-print('CUDA available:', torch.cuda.is_available())
-if torch.cuda.is_available():
-    print('CUDA device count:', torch.cuda.device_count())
-    print('CUDA device name:', torch.cuda.get_device_name(0))
-else:
-    print('CUDA not detected - running on CPU (slower but functional)')
-" 2>/dev/null || echo "Note: PyTorch CUDA test failed - this is normal if PyTorch is still installing"
-  deactivate
+# --- 4. Create convenience scripts ---
+print_message "Creating convenience scripts..."
+
+# Ensure scripts are executable
+chmod +x search-rag.sh 2>/dev/null || true
+chmod +x query-frontmatter.sh 2>/dev/null || true
+chmod +x reindex-rag.sh 2>/dev/null || true
+
+# --- 5. WSL Note ---
+if grep -qi microsoft /proc/version 2>/dev/null; then
+    echo ""
+    echo "Note: WSL environment detected."
+    echo "The tools work great in WSL. For best performance, keep your journal files"
+    echo "within the WSL filesystem rather than on Windows drives."
 fi
 
-print_message "Environment setup script finished."
-echo "To use the environments, navigate to the respective directories and run:"
-echo "For scripts: cd $SCRIPTS_DIR && source .venv/bin/activate"
-echo "For MCP:     cd $MCP_DIR && source .venv/bin/activate"
+# --- 6. Initial Index ---
+print_message "Setup complete!"
 echo ""
-echo "Next steps:"
-echo "1. Configure MCP servers with your AI agent"
-echo "2. Add journal entries to the journal/ directory"
-echo "3. Test the system with your AI agent or run:"
-echo "   python $SCRIPTS_DIR/rag_search.py (if scripts environment was set up)"
+echo "To get started:"
+echo "1. Add your journal entries to the 'journal/' directory"
+echo "2. Run './reindex-rag.sh' to build the search index"
+echo "3. Use './search-rag.sh \"your query\"' to search"
+echo "4. Use './query-frontmatter.sh --fields mood anxiety' to analyze metadata"
 echo ""
-if command -v nvidia-smi &> /dev/null; then
-  echo "Note: GPU acceleration should be available through PyTorch CUDA support"
-else
-  echo "Note: Running on CPU - consider installing NVIDIA drivers for better performance"
-fi 
+echo "First indexing will download embedding models (~400MB) to .fastembed_cache/"
+echo "This is a one-time download that will be cached for future use."

@@ -1,0 +1,17 @@
+[package]
+name = "rag-search"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+anyhow.workspace = true
+lancedb.workspace = true
+tokio.workspace = true
+arrow.workspace = true
+futures.workspace = true
+fastembed.workspace = true
